@@ -5,6 +5,7 @@ from typing import List, Optional
 from docx import Document
 from docx.shared import Inches
 import tempfile
+import img2pdf  # New import for image to PDF conversion
 
 
 def extract_images_from_pdf(pdf_path, output_folder):
@@ -106,6 +107,57 @@ def process_pdf_to_word(folder_path, output_folder=None):
     return documents_created
 
 
+def find_and_sort_images(folder_path):
+    """Find all image files in a folder and sort them by filename."""
+    # Common image file extensions
+    image_extensions = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff")
+
+    images = []
+
+    # Walk through the folder and find image files
+    for root, _, files in os.walk(folder_path):
+        for file_name in files:
+            if file_name.lower().endswith(image_extensions):
+                file_path = os.path.join(root, file_name)
+                images.append(file_path)
+
+    # Sort images by filename without extension
+    images.sort(key=lambda x: os.path.splitext(os.path.basename(x))[0])
+
+    return images
+
+
+def create_pdf_from_images(image_paths, output_pdf_path):
+    """Create a PDF file from a list of image paths."""
+    if not image_paths:
+        print("No images found to convert to PDF.")
+        return None
+
+    # Create PDF from images
+    with open(output_pdf_path, "wb") as f:
+        f.write(img2pdf.convert(image_paths))
+
+    print(f"PDF created: {output_pdf_path}")
+    return output_pdf_path
+
+
+def process_images_to_pdf(folder_path, output_pdf=None):
+    """Process all images in a folder and create a PDF file."""
+    # Find and sort images
+    image_paths = find_and_sort_images(folder_path)
+
+    if not image_paths:
+        print(f"No images found in folder: {folder_path}")
+        return None
+
+    # If no output path specified, use the folder name with .pdf extension
+    if output_pdf is None:
+        output_pdf = os.path.join(folder_path, os.path.basename(folder_path) + ".pdf")
+
+    # Create PDF from images
+    return create_pdf_from_images(image_paths, output_pdf)
+
+
 app = typer.Typer(help="Extract images from PDF files")
 
 
@@ -150,6 +202,23 @@ def pdf_to_word(
             typer.echo(f"  - {doc}")
     else:
         typer.echo("No Word documents were created.")
+
+
+@app.command()
+def images_to_pdf(
+    folder: str = typer.Argument(..., help="Folder containing image files to process"),
+    output_pdf: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Output PDF file path"
+    ),
+):
+    """Combine all images in a folder into a single PDF file, sorted by filename."""
+    if os.path.isdir(folder):
+        typer.echo(f"Processing images in folder: {folder}")
+        pdf_path = process_images_to_pdf(folder, output_pdf)
+        if pdf_path:
+            typer.echo(f"Created PDF: {pdf_path}")
+    else:
+        typer.echo(f"Error: {folder} is not a valid directory.")
 
 
 if __name__ == "__main__":

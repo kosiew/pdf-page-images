@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "img2pdf>=0.6.0",
     "python-docx>=1.1.2",
     "typer>=0.15.2",
 ]
