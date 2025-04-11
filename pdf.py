@@ -152,7 +152,10 @@ def process_images_to_pdf(folder_path, output_pdf=None):
 
     # If no output path specified, use the folder name with .pdf extension
     if output_pdf is None:
-        output_pdf = os.path.join(folder_path, os.path.basename(folder_path) + ".pdf")
+        # Get parent directory and use folder name for the PDF
+        parent_dir = os.path.dirname(folder_path)
+        folder_name = os.path.basename(folder_path)
+        output_pdf = os.path.join(parent_dir, folder_name + ".pdf")
 
     # Create PDF from images
     return create_pdf_from_images(image_paths, output_pdf)
