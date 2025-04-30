@@ -192,10 +192,10 @@ def process_pdf_to_images_pdf(pdf_path):
     return created_pdf
 
 
-app = typer.Typer(help="Extract images from PDF files")
+app = typer.Typer(help="PDF Image Extraction and Conversion Utility - Process PDFs and images in various ways")
 
 
-@app.command()
+@app.command(help="Extract pages from PDFs as individual image files")
 def extract_images(
     folders: List[str] = typer.Argument(
         ..., help="Folders containing PDF files to process"
@@ -210,7 +210,7 @@ def extract_images(
             typer.echo(f"Warning: {folder} is not a valid directory.")
 
 
-@app.command()
+@app.command(help="Convert PDFs to Word documents with each page as an embedded image")
 def pdf_to_word(
     folders: List[str] = typer.Argument(
         ..., help="Folders containing PDF files to process"
@@ -238,7 +238,7 @@ def pdf_to_word(
         typer.echo("No Word documents were created.")
 
 
-@app.command()
+@app.command(help="Combine all images in a folder into a single PDF document")
 def images_to_pdf(
     folder: str = typer.Argument(..., help="Folder containing image files to process"),
     output_pdf: Optional[str] = typer.Option(
@@ -258,7 +258,7 @@ def images_to_pdf(
         typer.echo(f"Error: {folder} is not a valid directory.")
 
 
-@app.command()
+@app.command(help="Convert PDFs to image-based PDFs - to prevent copying signatures")
 def pdf_reimage(
     folder: str = typer.Argument(..., help="Folder containing PDF files to process"),
 ):
