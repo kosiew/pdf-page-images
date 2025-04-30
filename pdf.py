@@ -161,6 +161,37 @@ def process_images_to_pdf(folder_path, output_pdf=None):
     return create_pdf_from_images(image_paths, output_pdf)
 
 
+def process_pdf_to_images_pdf(pdf_path):
+    """
+    Process a PDF file:
+    1. Extract its pages as images into a temporary folder
+    2. Combine those images into a new PDF with '-images' suffix
+    Returns the path to the new PDF if successful
+    """
+    # Get path components
+    pdf_dir = os.path.dirname(pdf_path)
+    pdf_name = os.path.basename(pdf_path)
+    base_name = os.path.splitext(pdf_name)[0]
+    output_pdf = os.path.join(pdf_dir, f"{base_name}-images.pdf")
+    
+    # Create temporary folder for images
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Extract images from PDF
+        extract_images_from_pdf(pdf_path, temp_dir)
+        
+        # Find and sort images
+        image_paths = find_and_sort_images(temp_dir)
+        
+        if not image_paths:
+            print(f"No images extracted from {pdf_path}")
+            return None
+            
+        # Create new PDF from the images
+        created_pdf = create_pdf_from_images(image_paths, output_pdf)
+        
+    return created_pdf
+
+
 app = typer.Typer(help="Extract images from PDF files")
 
 
@@ -217,11 +248,50 @@ def images_to_pdf(
     """Combine all images in a folder into a single PDF file, sorted by filename."""
     if os.path.isdir(folder):
         typer.echo(f"Processing images in folder: {folder}")
+        # If no output path specified, create PDF within the folder
+        if output_pdf is None:
+            output_pdf = os.path.join(folder, os.path.basename(folder) + ".pdf")
         pdf_path = process_images_to_pdf(folder, output_pdf)
         if pdf_path:
             typer.echo(f"Created PDF: {pdf_path}")
     else:
         typer.echo(f"Error: {folder} is not a valid directory.")
+
+
+@app.command()
+def pdf_reimage(
+    folder: str = typer.Argument(..., help="Folder containing PDF files to process"),
+):
+    """
+    For each PDF in the folder:
+    1. Convert all pages to images
+    2. Assemble those images back into a new PDF with '-images' suffix
+    """
+    converted_pdfs = []
+    
+    if not os.path.isdir(folder):
+        typer.echo(f"Error: {folder} is not a valid directory.")
+        return
+    
+    # Find all PDFs in the folder
+    for root, _, files in os.walk(folder):
+        for file_name in files:
+            if file_name.lower().endswith(".pdf") and not file_name.lower().endswith("-images.pdf"):
+                pdf_path = os.path.join(root, file_name)
+                typer.echo(f"Processing: {pdf_path}")
+                
+                # Process the PDF
+                new_pdf = process_pdf_to_images_pdf(pdf_path)
+                if new_pdf:
+                    converted_pdfs.append((pdf_path, new_pdf))
+    
+    # Output summary
+    if converted_pdfs:
+        typer.echo(f"\nConverted {len(converted_pdfs)} PDF(s):")
+        for original, new_pdf in converted_pdfs:
+            typer.echo(f"  - {original} → {os.path.basename(new_pdf)}")
+    else:
+        typer.echo("No PDFs were converted.")
 
 
 if __name__ == "__main__":
