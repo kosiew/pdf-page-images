@@ -260,30 +260,42 @@ def images_to_pdf(
 
 @app.command(help="Convert PDFs to image-based PDFs - to prevent copying signatures")
 def pdf_reimage(
-    folder: str = typer.Argument(..., help="Folder containing PDF files to process"),
+    file_path: str = typer.Argument(..., help="PDF file or folder containing PDF files to process"),
 ):
     """
-    For each PDF in the folder:
+    For each PDF in the folder or the specified PDF file:
     1. Convert all pages to images
     2. Assemble those images back into a new PDF with '-images' suffix
     """
     converted_pdfs = []
     
-    if not os.path.isdir(folder):
-        typer.echo(f"Error: {folder} is not a valid directory.")
-        return
+    def process_single_pdf(pdf_path):
+        """Helper function to process a single PDF file if valid"""
+        if pdf_path.lower().endswith(".pdf") and not pdf_path.lower().endswith("-images.pdf"):
+            typer.echo(f"Processing: {pdf_path}")
+            new_pdf = process_pdf_to_images_pdf(pdf_path)
+            if new_pdf:
+                converted_pdfs.append((pdf_path, new_pdf))
+            return True
+        return False
     
-    # Find all PDFs in the folder
-    for root, _, files in os.walk(folder):
-        for file_name in files:
-            if file_name.lower().endswith(".pdf") and not file_name.lower().endswith("-images.pdf"):
+    if os.path.isdir(file_path):
+        # Process all PDFs in the directory
+        typer.echo(f"Processing all PDFs in directory: {file_path}")
+        
+        # Find all PDFs in the folder
+        for root, _, files in os.walk(file_path):
+            for file_name in files:
                 pdf_path = os.path.join(root, file_name)
-                typer.echo(f"Processing: {pdf_path}")
+                process_single_pdf(pdf_path)
                 
-                # Process the PDF
-                new_pdf = process_pdf_to_images_pdf(pdf_path)
-                if new_pdf:
-                    converted_pdfs.append((pdf_path, new_pdf))
+    elif os.path.isfile(file_path):
+        # Process a single PDF file
+        if not process_single_pdf(file_path):
+            typer.echo(f"Error: {file_path} is not a PDF file.")
+    else:
+        typer.echo(f"Error: {file_path} does not exist or is not accessible.")
+        return
     
     # Output summary
     if converted_pdfs:
