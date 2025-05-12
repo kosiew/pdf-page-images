@@ -6,6 +6,9 @@ from docx import Document
 from docx.shared import Inches
 import tempfile
 import img2pdf  # New import for image to PDF conversion
+import zipfile  # For extracting images from docx
+import re  # For matching file patterns
+import shutil  # For copying extracted files
 
 
 def extract_images_from_pdf(pdf_path, output_folder):
@@ -192,6 +195,89 @@ def process_pdf_to_images_pdf(pdf_path):
     return created_pdf
 
 
+def extract_images_from_docx(docx_path, output_folder):
+    """
+    Extract all images from a Word document (.docx) and save them to the specified folder
+    with sequential numbering.
+    """
+    # Ensure output folder exists
+    os.makedirs(output_folder, exist_ok=True)
+    
+    # A .docx file is actually a zip file, so we can extract its contents
+    image_count = 0
+    
+    # Create a temporary directory to extract the docx contents
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Extract the docx contents to the temp directory
+        with zipfile.ZipFile(docx_path, 'r') as docx_zip:
+            # Find all image files in the docx
+            image_files = [f for f in docx_zip.namelist() 
+                          if f.startswith('word/media/') and 
+                          f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff'))]
+            
+            # Extract each image and copy it to the output folder with sequential naming
+            for img_path in image_files:
+                # Extract to temp directory
+                docx_zip.extract(img_path, temp_dir)
+                
+                # Get image file extension
+                _, ext = os.path.splitext(img_path)
+                
+                # Create sequentially named target path
+                image_count += 1
+                target_path = os.path.join(output_folder, f"image_{image_count:03d}{ext}")
+                
+                # Copy the file to the output folder
+                shutil.copy2(os.path.join(temp_dir, img_path), target_path)
+                print(f"Extracted: {target_path}")
+    
+    return image_count
+
+
+def process_docx_or_folder(path):
+    """
+    Process a given path:
+    1. If it's a folder, recursively process all files
+    2. If it's a docx file, extract all images from it
+    """
+    if os.path.isdir(path):
+        # It's a folder - process all files within recursively
+        images_extracted = 0
+        processed_files = 0
+        
+        for root, _, files in os.walk(path):
+            for file_name in files:
+                if file_name.lower().endswith('.docx'):
+                    file_path = os.path.join(root, file_name)
+                    # Create output folder with the same name as the docx (minus extension)
+                    output_folder = os.path.join(root, os.path.splitext(file_name)[0])
+                    
+                    # Extract images from the docx
+                    count = extract_images_from_docx(file_path, output_folder)
+                    
+                    if count > 0:
+                        images_extracted += count
+                        processed_files += 1
+                        print(f"Extracted {count} images from {file_path} to {output_folder}")
+        
+        return processed_files, images_extracted
+    
+    elif os.path.isfile(path) and path.lower().endswith('.docx'):
+        # It's a docx file - extract images directly
+        output_folder = os.path.join(os.path.dirname(path), os.path.splitext(os.path.basename(path))[0])
+        count = extract_images_from_docx(path, output_folder)
+        
+        if count > 0:
+            print(f"Extracted {count} images from {path} to {output_folder}")
+            return 1, count
+        return 0, 0
+    
+    else:
+        # Neither a folder nor a docx file
+        print(f"Error: {path} is not a valid directory or Word document.")
+        return 0, 0
+
+
 app = typer.Typer(help="PDF Image Extraction and Conversion Utility - Process PDFs and images in various ways")
 
 
@@ -304,6 +390,25 @@ def pdf_reimage(
             typer.echo(f"  - {original} → {os.path.basename(new_pdf)}")
     else:
         typer.echo("No PDFs were converted.")
+
+
+@app.command(help="Extract images from Word documents (.docx files)")
+def docx_images(
+    path: str = typer.Argument(..., help="Word document (.docx) or folder containing .docx files")
+):
+    """
+    Extract all images from Word documents:
+    1. If a folder is provided, process all .docx files recursively
+    2. If a .docx file is provided, process just that file
+    3. Images are saved in a folder with the same name as the document
+    """
+    processed_files, images_extracted = process_docx_or_folder(path)
+    
+    # Output summary
+    if processed_files > 0:
+        typer.echo(f"\nProcessed {processed_files} Word document(s), extracted {images_extracted} images.")
+    else:
+        typer.echo("No images were extracted from any Word documents.")
 
 
 if __name__ == "__main__":
