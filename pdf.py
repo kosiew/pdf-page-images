@@ -9,6 +9,7 @@ import img2pdf  # New import for image to PDF conversion
 import zipfile  # For extracting images from docx
 import re  # For matching file patterns
 import shutil  # For copying extracted files
+from PIL import Image  # For image manipulation
 
 
 def extract_images_from_pdf(pdf_path, output_folder):
@@ -278,6 +279,65 @@ def process_docx_or_folder(path):
         return 0, 0
 
 
+def stitch_images_in_folder(folder_path, output_image=None, horizontal=False):
+    """
+    Stitch all images in a folder into a single image.
+    
+    Args:
+        folder_path: Path to the folder containing images
+        output_image: Path to save the stitched image (if None, uses folder name)
+        horizontal: If True, stitch images side by side; otherwise stack vertically
+    
+    Returns:
+        Path to the stitched image if successful, None otherwise
+    """
+    # Find and sort images
+    image_paths = find_and_sort_images(folder_path)
+    
+    if not image_paths:
+        print(f"No images found in folder: {folder_path}")
+        return None
+    
+    # Open all images
+    images = [Image.open(img_path) for img_path in image_paths]
+    
+    # Calculate dimensions of the stitched image
+    if horizontal:
+        # Images side by side
+        width = sum(img.width for img in images)
+        height = max(img.height for img in images)
+    else:
+        # Images stacked vertically
+        width = max(img.width for img in images)
+        height = sum(img.height for img in images)
+    
+    # Create a new blank image
+    stitched_img = Image.new('RGB', (width, height), color=(255, 255, 255))
+    
+    # Paste images into the stitched image
+    offset = 0
+    for img in images:
+        if horizontal:
+            # Place side by side
+            stitched_img.paste(img, (offset, 0))
+            offset += img.width
+        else:
+            # Stack vertically
+            stitched_img.paste(img, (0, offset))
+            offset += img.height
+    
+    # If no output path specified, create it in the folder
+    if output_image is None:
+        folder_name = os.path.basename(folder_path)
+        output_image = os.path.join(folder_path, f"{folder_name}_stitched.png")
+    
+    # Save the stitched image
+    stitched_img.save(output_image)
+    print(f"Stitched image saved: {output_image}")
+    
+    return output_image
+
+
 app = typer.Typer(help="PDF Image Extraction and Conversion Utility - Process PDFs and images in various ways")
 
 
@@ -409,6 +469,29 @@ def docx_images(
         typer.echo(f"\nProcessed {processed_files} Word document(s), extracted {images_extracted} images.")
     else:
         typer.echo("No images were extracted from any Word documents.")
+
+
+@app.command(help="Stitch all images in a folder into a single image")
+def stitch_images(
+    folder: str = typer.Argument(..., help="Folder containing image files to stitch"),
+    output_image: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Output image file path"
+    ),
+    horizontal: bool = typer.Option(
+        False, "--horizontal", "-h", help="Stitch images horizontally instead of vertically"
+    )
+):
+    """
+    Combine all images in a folder into a single stitched image.
+    By default, images are stacked vertically in alphabetical order.
+    """
+    if os.path.isdir(folder):
+        typer.echo(f"Stitching images in folder: {folder}")
+        result = stitch_images_in_folder(folder, output_image, horizontal)
+        if result:
+            typer.echo(f"Created stitched image: {result}")
+    else:
+        typer.echo(f"Error: {folder} is not a valid directory.")
 
 
 if __name__ == "__main__":
