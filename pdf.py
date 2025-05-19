@@ -165,7 +165,7 @@ def process_images_to_pdf(folder_path, output_pdf=None):
     return create_pdf_from_images(image_paths, output_pdf)
 
 
-def process_pdf_to_images_pdf(pdf_path):
+def convert_pdf_to_image_based_pdf(pdf_path):
     """
     Process a PDF file:
     1. Extract its pages as images into a temporary folder
@@ -419,7 +419,7 @@ def pdf_reimage(
         """Helper function to process a single PDF file if valid"""
         if pdf_path.lower().endswith(".pdf") and not pdf_path.lower().endswith("-images.pdf"):
             typer.echo(f"Processing: {pdf_path}")
-            new_pdf = process_pdf_to_images_pdf(pdf_path)
+            new_pdf = convert_pdf_to_image_based_pdf(pdf_path)
             if new_pdf:
                 converted_pdfs.append((pdf_path, new_pdf))
             return True
